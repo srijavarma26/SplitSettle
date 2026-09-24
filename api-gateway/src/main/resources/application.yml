@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: user-service-auth
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/v1/auth/**
+
+        - id: user-service-users
+          uri: ${USER_SERVICE_URL:http://user-service:8081}
+          predicates:
+            - Path=/api/v1/users/{id}, /api/v1/users/{id}/exists
+
+        - id: expense-service-groups
+          uri: ${EXPENSE_SERVICE_URL:http://expense-service:8082}
+          predicates:
+            - Path=/api/v1/groups/**
+
+        - id: expense-service-user-balances
+          uri: ${EXPENSE_SERVICE_URL:http://expense-service:8082}
+          predicates:
+            - Path=/api/v1/users/{userId}/balances
+
+        - id: settlement-service
+          uri: ${SETTLEMENT_SERVICE_URL:http://settlement-service:8083}
+          predicates:
+            - Path=/api/v1/settlements/**

@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # MySQL Databases per Microservice
+  user-db:
+    image: mysql:8.0
+    container_name: splitsettle-user-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: splitsettle_user_db
+    ports:
+      - "3309:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  expense-db:
+    image: mysql:8.0
+    container_name: splitsettle-expense-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: splitsettle_expense_db
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  settlement-db:
+    image: mysql:8.0
+    container_name: splitsettle-settlement-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: splitsettle_settlement_db
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Spring Boot Microservices
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: splitsettle-user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=user-db
+      - DB_PORT=3306
+      - DB_NAME=splitsettle_user_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+    depends_on:
+      user-db:
+        condition: service_healthy
+
+  expense-service:
+    build:
+      context: ./expense-service
+      dockerfile: Dockerfile
+    container_name: splitsettle-expense-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DB_HOST=expense-db
+      - DB_PORT=3306
+      - DB_NAME=splitsettle_expense_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - USER_SERVICE_URL=http://user-service:8081
+    depends_on:
+      expense-db:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+
+  settlement-service:
+    build:
+      context: ./settlement-service
+      dockerfile: Dockerfile
+    container_name: splitsettle-settlement-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DB_HOST=settlement-db
+      - DB_PORT=3306
+      - DB_NAME=splitsettle_settlement_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - EXPENSE_SERVICE_URL=http://expense-service:8082
+    depends_on:
+      settlement-db:
+        condition: service_healthy
+      expense-service:
+        condition: service_started
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: splitsettle-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - USER_SERVICE_URL=http://user-service:8081
+      - EXPENSE_SERVICE_URL=http://expense-service:8082
+      - SETTLEMENT_SERVICE_URL=http://settlement-service:8083
+    depends_on:
+      - user-service
+      - expense-service
+      - settlement-service
+
+networks:
+  default:
+    name: splitsettle-network
